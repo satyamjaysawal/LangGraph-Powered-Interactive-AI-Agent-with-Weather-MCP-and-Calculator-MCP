@@ -1,6 +1,105 @@
 # LangGraph-Powered-Interactive-AI-Agent-with-Weather-MCP
+****
+Here's a Mermaid diagram illustrating the architecture and workflow of your LangGraph-powered interactive AI agent with MCP servers:
+
+```mermaid
+graph TD
+    subgraph User Interaction
+        A[User] -->|Asks question| B(main.py)
+        B -->|Displays response| A
+    end
+
+    subgraph LangGraph Agent
+        B --> C[StateGraph]
+        C --> D[call_model Node]
+        D -->|LLM decision| E[ToolNode]
+        E -->|Tool execution| F[MultiServerMCPClient]
+        F --> G{Server Selection}
+    end
+
+    subgraph MCP Servers
+        G -->|Weather Query| H[Weather MCP Server]
+        G -->|Calculation| I[Calculator MCP Server]
+        H -->|OpenWeatherMap API| J[[Internet]]
+        I -->|Math Evaluation| K[Local Processing]
+    end
+
+    subgraph External Services
+        H --> L[(OpenWeatherMap API)]
+    end
+
+    subgraph Environment
+        M[.env File] -->|API Keys| B
+        M -->|OWM_API_KEY| H
+        N[Go Runtime] --> H
+        O[Python] --> I
+    end
+
+    classDef user fill:#9cf,stroke:#333;
+    classDef app fill:#c9f,stroke:#333;
+    classDef agent fill:#f9d,stroke:#333;
+    classDef server fill:#fd8,stroke:#333;
+    classDef service fill:#8f8,stroke:#333;
+    classDef env fill:#aaf,stroke:#333;
+    
+    class A user;
+    class B app;
+    class C,D,E,F agent;
+    class H,I server;
+    class L,J,K service;
+    class M,N,O env;
+```
+
+### Diagram Explanation:
+
+1. **User Interaction**:
+   - User asks questions through the main.py script
+   - Agent displays final responses
+
+2. **LangGraph Agent Workflow**:
+   - `StateGraph` manages the execution flow
+   - `call_model Node`: GPT-4o-mini processes input and decides tool usage
+   - `ToolNode`: Routes requests to appropriate tools
+   - `MultiServerMCPClient`: Manages communication with MCP servers
+
+3. **MCP Servers**:
+   - **Weather MCP Server**:
+     - Built with Go
+     - Connects to OpenWeatherMap API
+   - **Calculator MCP Server**:
+     - Python-based
+     - Handles math evaluations locally
+
+4. **External Services**:
+   - OpenWeatherMap API for weather data
+   - Internet access for API communication
+
+5. **Environment**:
+   - `.env` file stores API keys
+   - Go runtime for weather server
+   - Python for calculator server and main application
+
+### Sequence Flow:
+1. User submits query through main.py
+2. LangGraph routes to call_model (GPT-4o-mini)
+3. LLM decides if tools are needed
+4. If tools required:
+   - Request routed to MultiServerMCPClient
+   - Client selects appropriate MCP server
+   - Server processes request (either weather API or calculation)
+   - Response returned to ToolNode
+5. Final response formatted by LLM
+6. Answer displayed to user
 
 
+
+
+
+
+
+****
+
+****
 ### Steps to Create This Project
 
 This project is an interactive AI agent built with LangGraph (from LangChain) that can answer weather-related queries (using an OpenWeatherMap API via an MCP server) and perform calculations (via another MCP server). It uses OpenAI's GPT-4o-mini model to decide when to call tools and processes user inputs in a loop.
