@@ -90,6 +90,109 @@ graph TD
    - Response returned to ToolNode
 5. Final response formatted by LLM
 6. Answer displayed to user
+****
+****
+
+## transport: stdio
+
+Here's a Mermaid diagram focusing on the `stdio` transport mechanism and its role in your MCP architecture:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Agent as LangGraph Agent (main.py)
+    participant MCPClient as MultiServerMCPClient
+    participant WeatherServer as Weather MCP (mcp-weather.exe)
+    participant CalculatorServer as Calculator MCP (python -m mcp_server_calculator)
+
+    User->>Agent: "What's the weather in Paris?"
+    Agent->>MCPClient: Tool request (weather)
+    Note right of MCPClient: stdio transport selected
+    MCPClient->>WeatherServer: Write JSON-RPC request to stdin
+    Note over WeatherServer: Processes request
+    WeatherServer->>MCPClient: Write JSON-RPC response to stdout
+    MCPClient->>Agent: Tool result
+    Agent->>User: "Current weather in Paris: 22°C, sunny"
+
+    User->>Agent: "Calculate 2^5 + 3*4"
+    Agent->>MCPClient: Tool request (calculator)
+    Note right of MCPClient: stdio transport selected
+    MCPClient->>CalculatorServer: Write JSON-RPC request to stdin
+    Note over CalculatorServer: Processes request
+    CalculatorServer->>MCPClient: Write JSON-RPC response to stdout
+    MCPClient->>Agent: Tool result (32 + 12 = 44)
+    Agent->>User: "Result: 44"
+```
+
+### Key Components Explained:
+
+1. **stdio Transport Mechanism**:
+```mermaid
+graph LR
+    A[MCPClient] -->|Write to stdin| B[Server Process]
+    B -->|Write to stdout| A
+    C[Server Process] -->|Read from stdin| A
+    A -->|Read from stdout| C
+```
+
+2. **JSON-RPC Message Format**:
+
+### stdio Transport Characteristics:
+1. **Synchronous Communication**:
+   - Client writes to server's stdin
+   - Server reads from stdin
+   - Server processes request
+   - Server writes to stdout
+   - Client reads from stdout
+
+2. **Advantages**:
+   - Simple inter-process communication
+   - No network configuration needed
+   - Works across platforms
+   - Easy debugging (can capture stdin/stdout)
+
+3. **Data Flow**:
+```mermaid
+flowchart TB
+    subgraph Agent Process
+        A[LangGraph] --> B[MultiServerMCPClient]
+    end
+    
+    subgraph Weather Server
+        C[mcp-weather.exe] --> D[OpenWeatherMap API]
+    end
+    
+    subgraph Calculator Server
+        E[Python Calculator]
+    end
+    
+    B -->|stdio\nstdin| C
+    C -->|stdio\nstdout| B
+    B -->|stdio\nstdin| E
+    E -->|stdio\nstdout| B
+```
+
+This diagram shows:
+- How stdio transport enables communication between the main agent and MCP servers
+- The request/response cycle using JSON-RPC over stdin/stdout
+- Separation of concerns between different components
+- Synchronous nature of the communication
+- How weather and calculator requests are handled differently
+
+The stdio transport provides a simple but effective way to connect your LangGraph agent with specialized MCP servers without requiring complex networking setups.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
