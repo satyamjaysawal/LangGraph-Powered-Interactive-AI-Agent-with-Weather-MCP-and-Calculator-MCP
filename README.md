@@ -8,9 +8,9 @@ This project is an interactive AI agent built with LangGraph (from LangChain) th
 Follow these steps to set up and run the project from scratch. I'll assume you're on Windows (based on the `.exe` in the code), but notes for other OS are included. The project requires setting up two MCP (Model Context Protocol) servers for the tools, which are external processes that the agent connects to via the `langchain-mcp-adapters` library.
 
 ---
-Here's the information formatted as a `README.md` file:
+****
 
-```markdown
+
 # MCP Server Setup Guide
 
 ## Public MCP Servers List
@@ -74,7 +74,7 @@ pip install python-dotenv langchain-mcp-adapters langgraph "langchain[openai]" m
 ---
 
 
-
+****
 
 
 
