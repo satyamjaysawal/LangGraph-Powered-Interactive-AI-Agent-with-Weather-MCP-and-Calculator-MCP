@@ -90,7 +90,7 @@ This simplified diagram focuses on the essential workflow steps and relationship
 
 
 
-# LangGraph-Powered-Interactive-AI-Agent-with-Weather-MCP
+# LangGraph-Powered-Interactive-AI-Agent-with-Weather-MCP-and-Calculator-MCP
 ****
 Here's a Mermaid diagram illustrating the architecture and workflow of your LangGraph-powered interactive AI agent with MCP servers:
 
