@@ -7,6 +7,80 @@ This project is an interactive AI agent built with LangGraph (from LangChain) th
 
 Follow these steps to set up and run the project from scratch. I'll assume you're on Windows (based on the `.exe` in the code), but notes for other OS are included. The project requires setting up two MCP (Model Context Protocol) servers for the tools, which are external processes that the agent connects to via the `langchain-mcp-adapters` library.
 
+---
+Here's the information formatted as a `README.md` file:
+
+```markdown
+# MCP Server Setup Guide
+
+## Public MCP Servers List
+👉 [GitHub Repository](https://github.com/modelcontextprotocol/servers)
+
+## Weather MCP Server Setup
+[Weather MCP Server GitHub](https://github.com/mschneider82/mcp-openweather)
+
+### Environment Setup
+
+1. **Install Go**  
+   Download from: [https://go.dev/dl/](https://go.dev/dl/)
+
+2. **Clone and Build**
+   ```bash
+   git clone https://github.com/mschneider82/mcp-openweather.git
+   cd mcp-openweather
+   go build -o mcp-weather
+   ```
+
+3. **Get OpenWeatherMap API Key**
+   - Visit [https://openweathermap.org/api](https://openweathermap.org/api)
+   - Create a free account
+   - Copy your API key (called `appid`)
+   - Note: If it doesn't work immediately, wait a few hours
+
+4. **Run the MCP Server Locally**
+   ```bash
+   ./mcp-weather
+   ```
+   ⚠️ Keep this terminal running - this is your MCP server.
+
+## Python Package Installation
+```bash
+pip install python-dotenv langchain-mcp-adapters langgraph "langchain[openai]" mcp
+```
+
+## Adding a Second MCP Server (Calculator)
+
+1. **Install Calculator Server**
+   ```bash
+   pip install mcp-server-calculator
+   ```
+
+2. **Run Servers in Separate Terminals**
+   - **Terminal 1 (Weather MCP Server)**
+     ```bash
+     ./mcp-weather.exe
+     ```
+   - **Terminal 2 (Calculator MCP Server)**
+     ```bash
+     python -m mcp_server_calculator
+     ```
+   - **Terminal 3 (Your Client)**
+     ```bash
+     python 1.py
+     ```
+```
+
+
+
+---
+
+
+
+
+
+
+
+
 #### Prerequisites
 - **Python 3.10+**: Install from [python.org](https://www.python.org/).
 - **Go 1.20+** (for building the weather MCP server): Install from [go.dev](https://go.dev/dl/).
