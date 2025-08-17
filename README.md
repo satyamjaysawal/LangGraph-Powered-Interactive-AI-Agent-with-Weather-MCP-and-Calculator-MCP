@@ -66,7 +66,7 @@ pip install python-dotenv langchain-mcp-adapters langgraph "langchain[openai]" m
      ```
    - **Terminal 3 (Your Client)**
      ```bash
-     python 1.py
+     python main.py
      ```
 
 
