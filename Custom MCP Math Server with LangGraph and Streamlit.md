@@ -1,5 +1,113 @@
 ## Custom MCP Math Server with LangGraph and Streamlit
 
+
+I apologize for the rendering issue. Let me provide a simplified and more compatible Mermaid diagram that should work reliably:
+
+```mermaid
+graph TD
+    A[User] --> B[Streamlit Web Interface]
+    B -->|Math Query| C[LangGraph Client]
+    C --> D[OpenAI gpt-4o-mini]
+    D -->|Tool Calls| C
+    C -->|Execute Tools| E[MCP Math Server]
+    E -->|Results| C
+    C -->|Final Answer| B
+    B -->|Display| A
+    
+    subgraph MCP Math Server
+        E --> F[add]
+        E --> G[multiply]
+        E --> H[divide]
+        E --> I[square_root]
+        E --> J[factorial]
+    end
+    
+    subgraph LangGraph Components
+        C --> K[State Graph]
+        K --> L[Model Node]
+        K --> M[Tool Node]
+        K --> N[Conditional Edges]
+    end
+```
+
+### Simplified Architecture Diagram:
+```mermaid
+graph LR
+    U[User] -->|Query| S(Streamlit Web App)
+    S -->|Process| L[LangGraph Client]
+    L --> O[OpenAI Model]
+    L --> M[MCP Server]
+    M --> T[Math Tools]
+    T -->|Results| L
+    L -->|Answer| S
+    S -->|Display| U
+
+    subgraph MCP Server
+        M --> T1(add)
+        M --> T2(multiply)
+        M --> T3(divide)
+        M --> T4(square_root)
+        M --> T5(factorial)
+    end
+```
+
+### Sequence Flow:
+```mermaid
+sequenceDiagram
+    participant User
+    participant Streamlit
+    participant LangGraph
+    participant OpenAI
+    participant MCPServer
+
+    User->>Streamlit: Enter math query
+    Streamlit->>LangGraph: Send query
+    LangGraph->>OpenAI: Request tool selection
+    OpenAI->>LangGraph: Return tool calls
+    LangGraph->>MCPServer: Execute first tool
+    MCPServer->>LangGraph: Return result
+    loop Until final answer
+        LangGraph->>OpenAI: Send updated state
+        OpenAI->>LangGraph: Return next tool
+        LangGraph->>MCPServer: Execute next tool
+        MCPServer->>LangGraph: Return result
+    end
+    LangGraph->>Streamlit: Send final answer
+    Streamlit->>User: Display result
+```
+
+### Key Components Explained:
+1. **Streamlit Web App**: 
+   - Single-page web interface
+   - Text input and button for queries
+   - Displays results
+
+2. **LangGraph Client**:
+   - Manages state machine
+   - Coordinates between OpenAI and MCP
+   - Handles tool execution flow
+
+3. **OpenAI Model**:
+   - gpt-4o-mini model
+   - Decides which tools to use
+   - Parses natural language queries
+
+4. **MCP Math Server**:
+   - HTTP server on port 8000
+   - Provides mathematical operations as tools
+   - Validates inputs (e.g., prevent division by zero)
+
+5. **Math Tools**:
+   - add: Integer addition
+   - multiply: Integer multiplication
+   - divide: Float division with zero check
+   - square_root: Non-negative roots
+   - factorial: Non-negative integers
+
+This simplified diagram should render properly in most Mermaid implementations while still capturing the core architecture and workflow of your custom MCP math system. The sequence diagram specifically shows the step-by-step flow for handling a query like "(3 + 5) × 12".
+
+---
+
 To build a custom MCP (Multi-Chain Protocol) server with LangGraph and Streamlit, as outlined in the provided code and setup instructions, follow these steps. The setup includes a custom MCP server for mathematical operations, a LangGraph-based client, and a Streamlit web interface, as demonstrated in the Hindi video tutorial you referenced. Below is a concise guide to set up, run, and understand the system, addressing the code and environment details you provided.
 
 ### Prerequisites
