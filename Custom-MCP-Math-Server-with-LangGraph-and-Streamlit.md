@@ -20,38 +20,6 @@
 
 # MCP Weather API
 
-### Step 1: Initialization
-1. Load environment variables
-2. Create `MultiServerMCPClient` with:
-   - Weather server configuration (`mcp-weather.exe`)
-   - Calculator server configuration (`mcp_server_calculator`)
-3. Fetch available tools using `client.get_tools()`
-4. Initialize ChatOpenAI model (GPT-4o-mini)
-5. Build LangGraph state machine
-
-### Step 2: Graph Construction
-```python
-builder = StateGraph(MessagesState)
-builder.add_node("call_model", call_model)   # LLM processing
-builder.add_node("tools", ToolNode(tools))   # Tool execution
-builder.add_edge(START, "call_model")        # Start with LLM
-builder.add_conditional_edges(               # Decide next step
-    "call_model", 
-    tools_condition
-)
-builder.add_edge("tools", "call_model")      # Loop back to LLM
-graph = builder.compile()                    # Finalize graph
-```
-
-### Step 3: User Interaction Loop
-```python
-while True:
-    user_question = input()
-    if exit_command: break
-    result = await graph.ainvoke({"messages": user_question})
-    print(final_response)
-```
-
 ### Step 4: Execution Flow (Per Query)
 1. **Initial State Creation**  
    `{"messages": [HumanMessage(content=user_question)]}`
@@ -106,7 +74,40 @@ while True:
 4. **Synchronous Execution**: Each step completes before next begins
 5. **Error Handling**: Built-in LangGraph error management
 
-This workflow enables complex problem-solving by combining LLM reasoning with specialized tools while maintaining conversation context.
+
+### Step 1: Initialization
+1. Load environment variables
+2. Create `MultiServerMCPClient` with:
+   - Weather server configuration (`mcp-weather.exe`)
+   - Calculator server configuration (`mcp_server_calculator`)
+3. Fetch available tools using `client.get_tools()`
+4. Initialize ChatOpenAI model (GPT-4o-mini)
+5. Build LangGraph state machine
+
+### Step 2: Graph Construction
+```python
+builder = StateGraph(MessagesState)
+builder.add_node("call_model", call_model)   # LLM processing
+builder.add_node("tools", ToolNode(tools))   # Tool execution
+builder.add_edge(START, "call_model")        # Start with LLM
+builder.add_conditional_edges(               # Decide next step
+    "call_model", 
+    tools_condition
+)
+builder.add_edge("tools", "call_model")      # Loop back to LLM
+graph = builder.compile()                    # Finalize graph
+```
+
+### Step 3: User Interaction Loop
+```python
+while True:
+    user_question = input()
+    if exit_command: break
+    result = await graph.ainvoke({"messages": user_question})
+    print(final_response)
+```
+
+
 
 ****
 
