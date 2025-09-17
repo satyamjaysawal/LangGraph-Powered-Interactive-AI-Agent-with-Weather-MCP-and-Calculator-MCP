@@ -1,3 +1,447 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+****
+
+Here's a simplified, error-free Mermaid diagram that focuses on the core workflow:
+
+```mermaid
+flowchart TD
+    A[User Input] --> B[Initialize State]
+    B --> C[call_model Node]
+    C --> D{LLM Decision}
+    D -->|Direct Answer| E[Generate Response]
+    D -->|Tool Needed| F[Identify Tool]
+    F -->|Weather| G[Execute Weather Tool]
+    F -->|Calculator| H[Execute Calculator Tool]
+    G --> I[Call Weather Server]
+    H --> J[Call Calculator Server]
+    I --> K[Get Weather Data]
+    J --> L[Calculate Result]
+    K --> M[Create ToolMessage]
+    L --> M
+    M --> N[Update State]
+    N --> C
+    E --> O[Final Response]
+    O --> P[Output to User]
+    
+    subgraph "MCP Servers"
+        I
+        J
+    end
+    
+    subgraph "External Services"
+        K[[OpenWeatherMap API]]
+    end
+```
+
+### Text-based Workflow Explanation:
+
+1. **Start**: User provides input (e.g., "What's the weather in Paris?")
+2. **State Initialization**: System creates initial state with user message
+3. **LLM Processing**:
+   - GPT-4o-mini analyzes the query
+   - Decides whether to:
+     - Answer directly (path A)
+     - Use tools (path B)
+4. **Tool Execution Path**:
+   - Weather tool selected for weather queries
+     - Calls weather server executable
+     - Fetches data from OpenWeatherMap API
+   - Calculator tool selected for math problems
+     - Calls Python calculator module
+     - Performs calculation
+5. **Result Handling**:
+   - Tool results converted to ToolMessage
+   - State updated with new message
+6. **Feedback Loop**:
+   - Updated state returns to LLM
+   - LLM processes tool results
+7. **Final Response**:
+   - When no more tools needed:
+     - LLM generates natural language response
+     - Output returned to user
+8. **Continuous Loop**:
+   - System waits for next user input
+   - Process repeats until "exit" command
+
+### Key Components:
+- **call_model Node**: LLM decision hub (routes to tools or direct answer)
+- **tools Node**: Executes MCP server commands
+- **State Management**: Maintains conversation history
+- **Feedback Loop**: Allows chaining multiple tool calls
+- **Stdio Transport**: JSON-RPC communication via stdin/stdout
+
+This simplified diagram focuses on the essential workflow steps and relationships while avoiding complex styling that could cause rendering issues. The text explanation complements the visual by providing implementation details.
+
+
+
+
+
+
+
+
+****
+
+
+****
+
+
+
+Here's a step-by-step breakdown of the LangGraph workflow in your code, without diagrams:
+
+### Step 1: Initialization
+1. Load environment variables
+2. Create `MultiServerMCPClient` with:
+   - Weather server configuration (`mcp-weather.exe`)
+   - Calculator server configuration (`mcp_server_calculator`)
+3. Fetch available tools using `client.get_tools()`
+4. Initialize ChatOpenAI model (GPT-4o-mini)
+5. Build LangGraph state machine
+
+### Step 2: Graph Construction
+```python
+builder = StateGraph(MessagesState)
+builder.add_node("call_model", call_model)   # LLM processing
+builder.add_node("tools", ToolNode(tools))   # Tool execution
+builder.add_edge(START, "call_model")        # Start with LLM
+builder.add_conditional_edges(               # Decide next step
+    "call_model", 
+    tools_condition
+)
+builder.add_edge("tools", "call_model")      # Loop back to LLM
+graph = builder.compile()                    # Finalize graph
+```
+
+### Step 3: User Interaction Loop
+```python
+while True:
+    user_question = input()
+    if exit_command: break
+    result = await graph.ainvoke({"messages": user_question})
+    print(final_response)
+```
+
+### Step 4: Execution Flow (Per Query)
+1. **Initial State Creation**  
+   `{"messages": [HumanMessage(content=user_question)]}`
+
+2. **call_model Node Execution**  
+   - LLM processes messages
+   - Binds available tools
+   - Returns either:
+     - Direct answer (`AIMessage` with content)
+     - Tool call request (`AIMessage` with tool_calls)
+
+3. **Condition Check**  
+   - `tools_condition` checks last message:
+     - If `tool_calls` exist → go to "tools" node
+     - No tool calls → return final response
+
+4. **tools Node Execution**  
+   - For each tool call in `tool_calls`:
+     - Identify required tool (weather/calculator)
+     - Execute via MCP client
+     - Convert result to `ToolMessage`
+   - Append `ToolMessage` to state
+
+5. **Feedback Loop**  
+   - Return to "call_model" with updated state
+   - LLM processes tool results
+   - Repeat steps 2-4 until no more tool calls needed
+
+6. **Final Response**  
+   - Last `AIMessage` contains answer
+   - Returned to user
+
+### Step 5: Tool Execution Details
+**For Weather Requests:**
+1. MCP client sends JSON-RPC to `mcp-weather.exe` via stdio
+2. Weather server calls OpenWeatherMap API
+3. Returns structured weather data
+
+**For Calculations:**
+1. MCP client sends JSON-RPC to calculator module
+2. Calculator evaluates expression
+3. Returns numeric result
+
+### Step 6: Termination
+- Loop continues until user enters "exit" or "quit"
+- All processes cleanly shut down
+
+### Key Characteristics:
+1. **State Preservation**: Full message history maintained throughout
+2. **Dynamic Tool Handling**: Automatically routes to appropriate tool
+3. **Multi-turn Capability**: Can chain multiple tool calls
+4. **Synchronous Execution**: Each step completes before next begins
+5. **Error Handling**: Built-in LangGraph error management
+
+This workflow enables complex problem-solving by combining LLM reasoning with specialized tools while maintaining conversation context.
+
+****
+
+
+
+****
+
+
+
+****
+
+
+****
+
+****
+
+
+
+### LangGraph Workflow Step-by-Step with Code
+
+#### Step 1: Environment Setup & Initialization
+```python
+import asyncio
+import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langgraph.graph import StateGraph, MessagesState, START
+from langgraph.prebuilt import ToolNode, tools_condition
+
+# Load environment variables
+load_dotenv()
+
+async def main():
+    # Get API keys
+    openai_key = os.getenv("OPENAI_API_KEY")
+    owm_key = os.getenv("OWM_API_KEY")
+    
+    # Initialize MCP client with servers
+    client = MultiServerMCPClient({
+        "weather": {
+            "transport": "stdio",
+            "command": "mcp-weather.exe",
+            "env": {"OWM_API_KEY": owm_key}  
+        },
+        "calculator": {
+            "transport": "stdio",
+            "command": "python",
+            "args": ["-m", "mcp_server_calculator"]
+        }
+    })
+    
+    # STEP 1: Fetch available tools
+    tools = await client.get_tools()
+    
+    # Initialize LLM
+    model = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key)
+```
+
+#### Step 2: Graph Construction
+```python
+    # Define LLM processing node
+    def call_model(state: MessagesState):
+        # STEP 2: Process input and decide tool usage
+        response = model.bind_tools(tools).invoke(state["messages"])
+        return {"messages": response}
+    
+    # STEP 3: Build state graph
+    builder = StateGraph(MessagesState)
+    
+    # Add nodes
+    builder.add_node("call_model", call_model)  # Decision-making node
+    builder.add_node("tools", ToolNode(tools))   # Tool execution node
+    
+    # Set connections
+    builder.add_edge(START, "call_model")        # Start with LLM
+    
+    # STEP 4: Conditional routing
+    builder.add_conditional_edges(
+        "call_model",
+        tools_condition,  # Checks if tool_calls exist
+        {
+            "call_tools": "tools",  # Route to tools if needed
+            "end": END              # End if final response
+        }
+    )
+    
+    # Feedback loop
+    builder.add_edge("tools", "call_model")  # Return to LLM after tools
+    
+    # Compile graph
+    graph = builder.compile()
+```
+
+#### Step 3: Execution Flow (Per User Query)
+```python
+    while True:
+        user_input = input("\nAsk me anything → ")
+        
+        if user_input.lower() in ["exit", "quit"]:
+            break
+        
+        # STEP 5: Initialize state
+        initial_state = {"messages": [{"role": "user", "content": user_input}]}
+        
+        # Execute graph
+        result = await graph.ainvoke(initial_state)
+        
+        # STEP 6: Extract final response
+        final_message = result["messages"][-1]
+        print(f"\nAnswer: {final_message.content}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Key Execution Steps Explained with Code
+
+#### 1. Tool Execution (Inside `ToolNode`)
+```python
+# Simplified ToolNode implementation
+async def execute_tool(tool_name: str, arguments: dict):
+    # STEP 4a: Route to correct server
+    if tool_name == "get_current_weather":
+        # Call weather server via stdio
+        result = await client.invoke("weather", arguments)
+    elif tool_name == "calculate":
+        # Call calculator server
+        result = await client.invoke("calculator", arguments)
+    
+    # STEP 4b: Create ToolMessage
+    return ToolMessage(
+        content=str(result),
+        tool_call_id=tool_call_id
+    )
+```
+
+#### 2. Conditional Routing Logic
+```python
+def tools_condition(state: MessagesState):
+    # STEP 3: Check last message for tool_calls
+    last_message = state["messages"][-1]
+    
+    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        # Route to tools node if tool calls exist
+        return "call_tools"
+    else:
+        # End graph if no tool calls
+        return "end"
+```
+
+#### 3. Multi-Turn Tool Chaining
+```python
+# Example state evolution:
+initial_state = {
+    "messages": [
+        {"role": "user", "content": "What's 2^8? Then what's the weather in Paris?"}
+    ]
+}
+
+# After first LLM call:
+state_after_llm = {
+    "messages": [
+        user_message,
+        AIMessage(tool_calls=[{"name": "calculate", "args": {"expression": "2^8"}}])
+    ]
+}
+
+# After tool execution:
+state_after_tool = {
+    "messages": [
+        user_message,
+        ai_message,
+        ToolMessage(content="256", tool_call_id="call_123")
+    ]
+}
+
+# Final LLM response:
+final_state = {
+    "messages": [
+        ...previous_messages,
+        AIMessage(content="First calculation: 256. Now fetching Paris weather...")
+    ]
+}
+```
+
+### Full Sequence for a Weather Query
+1. User input: `"What's the temperature in London?"`
+2. State initialized: `{"messages": [HumanMessage(content="...")]}`
+3. `call_model` node:
+   ```python
+   # LLM returns:
+   AIMessage(
+       content="",
+       tool_calls=[{
+           "name": "get_current_weather",
+           "args": {"location": "London"}
+       }]
+   )
+   ```
+4. `tools_condition` detects tool calls → routes to `tools` node
+5. `ToolNode` executes weather server call
+6. State updated with `ToolMessage` containing weather data
+7. Loop back to `call_model` node
+8. LLM generates final response: `"Current temperature in London is 18°C"`
+9. No tool calls → return final response
+
+
+
+
+****
+****
+****
+****
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Custom MCP Math Server with LangGraph and Streamlit
 
 
