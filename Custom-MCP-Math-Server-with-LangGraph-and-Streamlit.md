@@ -1,94 +1,10 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-****
-
-Here's a simplified, error-free Mermaid diagram that focuses on the core workflow:
-
-```mermaid
-flowchart TD
-    A[User Input] --> B[Initialize State]
-    B --> C[call_model Node]
-    C --> D{LLM Decision}
-    D -->|Direct Answer| E[Generate Response]
-    D -->|Tool Needed| F[Identify Tool]
-    F -->|Weather| G[Execute Weather Tool]
-    F -->|Calculator| H[Execute Calculator Tool]
-    G --> I[Call Weather Server]
-    H --> J[Call Calculator Server]
-    I --> K[Get Weather Data]
-    J --> L[Calculate Result]
-    K --> M[Create ToolMessage]
-    L --> M
-    M --> N[Update State]
-    N --> C
-    E --> O[Final Response]
-    O --> P[Output to User]
-    
-    subgraph "MCP Servers"
-        I
-        J
-    end
-    
-    subgraph "External Services"
-        K[[OpenWeatherMap API]]
-    end
-```
-
-### Text-based Workflow Explanation:
-
-1. **Start**: User provides input (e.g., "What's the weather in Paris?")
-2. **State Initialization**: System creates initial state with user message
-3. **LLM Processing**:
-   - GPT-4o-mini analyzes the query
-   - Decides whether to:
-     - Answer directly (path A)
-     - Use tools (path B)
-4. **Tool Execution Path**:
-   - Weather tool selected for weather queries
-     - Calls weather server executable
-     - Fetches data from OpenWeatherMap API
-   - Calculator tool selected for math problems
-     - Calls Python calculator module
-     - Performs calculation
-5. **Result Handling**:
-   - Tool results converted to ToolMessage
-   - State updated with new message
-6. **Feedback Loop**:
-   - Updated state returns to LLM
-   - LLM processes tool results
-7. **Final Response**:
-   - When no more tools needed:
-     - LLM generates natural language response
-     - Output returned to user
-8. **Continuous Loop**:
-   - System waits for next user input
-   - Process repeats until "exit" command
-
-### Key Components:
+# Key Components:
 - **call_model Node**: LLM decision hub (routes to tools or direct answer)
 - **tools Node**: Executes MCP server commands
 - **State Management**: Maintains conversation history
 - **Feedback Loop**: Allows chaining multiple tool calls
 - **Stdio Transport**: JSON-RPC communication via stdin/stdout
 
-This simplified diagram focuses on the essential workflow steps and relationships while avoiding complex styling that could cause rendering issues. The text explanation complements the visual by providing implementation details.
-
 
 
 
@@ -102,8 +18,7 @@ This simplified diagram focuses on the essential workflow steps and relationship
 ****
 
 
-
-Here's a step-by-step breakdown of the LangGraph workflow in your code, without diagrams:
+# MCP Weather API
 
 ### Step 1: Initialization
 1. Load environment variables
