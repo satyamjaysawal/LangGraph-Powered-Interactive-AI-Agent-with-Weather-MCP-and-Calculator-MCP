@@ -1,5 +1,4 @@
 
-नीचे मैं LangGraph का उपयोग करके एक agentic AI workflow का Python code लिख रहा हूं। यह code पिछले context के आधार पर MCP servers (weather, math, JIRA, ServiceNow, Tavily) को integrate करता है, जहां agent planning, tool calling, और reflection करता है। Code LangChain और LangGraph पर आधारित है, जैसा कि web search results से उदाहरणों में दिखाया गया है (जैसे Medium articles और RealPython tutorial से inspiration लिया गया है)।
 
 ### Agentic Code (host_app.py)
 ```python
