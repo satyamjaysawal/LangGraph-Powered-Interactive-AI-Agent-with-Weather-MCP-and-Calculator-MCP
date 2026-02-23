@@ -1,4 +1,23 @@
+```PYTHON
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key_here
 
+# JIRA Atlassian
+JIRA_URL=https://your-instance.atlassian.net
+JIRA_USERNAME=your-email@example.com
+JIRA_API_TOKEN=your-api-token-here
+
+# ServiceNow
+SERVICENOW_INSTANCE_URL=https://your-instance.service-now.com
+SERVICENOW_USERNAME=your-username
+SERVICENOW_PASSWORD=your-password
+
+# Tavily
+TAVILY_API_KEY=your_tavily_api_key_here
+
+# OpenWeatherMap (for weather server)
+OWM_API_KEY=your_openweathermap_api_key
+```
 
 # Updated Multiple MCP Implementation with LangGraph Integration
 
