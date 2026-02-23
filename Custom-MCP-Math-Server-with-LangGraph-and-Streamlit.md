@@ -1,3 +1,155 @@
+
+
+# Updated Multiple MCP Implementation with LangGraph Integration
+
+Below is the complete code from the previous setup, incorporating LangGraph for building an agentic workflow. This includes all MCP servers (weather, math, JIRA Atlassian, ServiceNow, Tavily) and the host application with a custom LangGraph agent. The agent handles planning, tool calling, and reflection using the MCP tools.
+
+### weather_server.py
+```python
+from fastmcp import FastMCP
+import httpx
+
+mcp = FastMCP(name="WeatherServer")
+
+@mcp.tool
+async def get_weather(city: str) -> str:
+    """Get weather for a city."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"https://api.weather.example.com/{city}")  # Replace with real API
+        return resp.text
+
+if __name__ == "__main__":
+    mcp.run(transport="http", host="0.0.0.0", port=8001)
+```
+
+### math_server.py
+```python
+from fastmcp import FastMCP
+
+mcp = FastMCP(name="MathServer")
+
+@mcp.tool
+def add(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+### host_app.py (With LangGraph Agent)
+```python
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langgraph.graph import StateGraph, END
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
+from typing import TypedDict, List, Any
+import asyncio
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+llm = ChatOpenAI(model="gpt-4", api_key=os.getenv("OPENAI_API_KEY"))
+
+servers = {
+    "weather": {
+        "url": "http://localhost:8001/mcp",
+        "transport": "streamable_http"
+    },
+    "math": {
+        "command": "python math_server.py",
+        "transport": "stdio"
+    },
+    "jira_atlassian": {
+        "command": "docker",
+        "args": [
+            "run", "-i", "--rm",
+            "-e", "JIRA_URL",
+            "-e", "JIRA_USERNAME",
+            "-e", "JIRA_API_TOKEN",
+            "ghcr.io/sooperset/mcp-atlassian:latest"
+        ],
+        "env": {
+            "JIRA_URL": os.getenv("JIRA_URL", "https://your-instance.atlassian.net"),
+            "JIRA_USERNAME": os.getenv("JIRA_USERNAME", "your-email@example.com"),
+            "JIRA_API_TOKEN": os.getenv("JIRA_API_TOKEN", "your-api-token-here")
+        },
+        "transport": "stdio"
+    },
+    "servicenow": {
+        "command": "python",
+        "args": ["-m", "servicenow_mcp.cli"],
+        "env": {
+            "SERVICENOW_INSTANCE_URL": os.getenv("SERVICENOW_INSTANCE_URL", "https://your-instance.service-now.com"),
+            "SERVICENOW_USERNAME": os.getenv("SERVICENOW_USERNAME", "your-username"),
+            "SERVICENOW_PASSWORD": os.getenv("SERVICENOW_PASSWORD", "your-password")
+        },
+        "transport": "stdio"
+    },
+    "tavily": {
+        "url": f"https://mcp.tavily.com/mcp/?tavilyApiKey={os.getenv('TAVILY_API_KEY')}",
+        "transport": "streamable_http"
+    }
+}
+
+client = MultiServerMCPClient(servers)
+
+class AgentState(TypedDict):
+    messages: List[HumanMessage]
+    tool_results: List[Any]
+
+async def plan_node(state: AgentState):
+    prompt = SystemMessage(content="Plan the next action based on the query and available tools.")
+    response = await llm.ainvoke(state["messages"] + [prompt])
+    state["messages"].append(response)
+    return state
+
+async def tool_call_node(state: AgentState):
+    last_msg = state["messages"][-1].content
+    results = []
+    if "jira" in last_msg.lower():
+        result = await client.call_tool("create_issue", {"project_key": "PROJ", "summary": "Test", "description": last_msg})
+        results.append(result)
+    if "servicenow" in last_msg.lower():
+        result = await client.call_tool("create_incident", {"short_description": "Test", "description": last_msg})
+        results.append(result)
+    if "tavily" in last_msg.lower():
+        result = await client.call_tool("search", {"query": "Latest AI news"})
+        results.append(result)
+    # Add logic for weather/math as needed
+    state["tool_results"].extend(results)
+    return state
+
+async def reflect_node(state: AgentState):
+    prompt = SystemMessage(content=f"Reflect on results: {state['tool_results']}. Is the task complete?")
+    response = await llm.ainvoke(state["messages"] + [prompt])
+    state["messages"].append(response)
+    if "complete" in response.content.lower():
+        return "end"
+    return "continue"
+
+graph = StateGraph(AgentState)
+graph.add_node("plan", plan_node)
+graph.add_node("tool_call", tool_call_node)
+graph.add_node("reflect", reflect_node)
+graph.add_edge("plan", "tool_call")
+graph.add_edge("tool_call", "reflect")
+graph.add_conditional_edges("reflect", reflect_node, {"continue": "plan", "end": END})
+graph.set_entry_point("plan")
+
+agent = graph.compile()
+
+async def main():
+    tools = await client.get_tools()
+    print("Available Tools:", [tool.name for tool in tools])
+    inputs = {"messages": [HumanMessage(content="Create a JIRA ticket for weather issue in NY and search latest news via Tavily")], "tool_results": []}
+    result = await agent.ainvoke(inputs)
+    print("Agent Final Result:", result["tool_results"])
+
+asyncio.run(main())
+```
+
 # Key Components:
 - **call_model Node**: LLM decision hub (routes to tools or direct answer)
 - **tools Node**: Executes MCP server commands
