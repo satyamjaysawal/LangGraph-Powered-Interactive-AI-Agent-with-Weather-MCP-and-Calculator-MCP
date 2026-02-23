@@ -1,3 +1,217 @@
+
+नीचे मैं LangGraph का उपयोग करके एक agentic AI workflow का Python code लिख रहा हूं। यह code पिछले context के आधार पर MCP servers (weather, math, JIRA, ServiceNow, Tavily) को integrate करता है, जहां agent planning, tool calling, और reflection करता है। Code LangChain और LangGraph पर आधारित है, जैसा कि web search results से उदाहरणों में दिखाया गया है (जैसे Medium articles और RealPython tutorial से inspiration लिया गया है)।
+
+### Agentic Code (host_app.py)
+```python
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langgraph.graph import StateGraph, END
+from langgraph.prebuilt import ToolNode, tools_condition
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from typing import TypedDict, List, Any
+import asyncio
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+llm = ChatOpenAI(model="gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))
+
+# MCP Servers Configuration (from previous context)
+servers = {
+    "weather": {
+        "url": "http://localhost:8001/mcp",
+        "transport": "streamable_http"
+    },
+    "math": {
+        "command": "python math_server.py",
+        "transport": "stdio"
+    },
+    "jira_atlassian": {
+        "command": "docker",
+        "args": [
+            "run", "-i", "--rm",
+            "-e", "JIRA_URL",
+            "-e", "JIRA_USERNAME",
+            "-e", "JIRA_API_TOKEN",
+            "ghcr.io/sooperset/mcp-atlassian:latest"
+        ],
+        "env": {
+            "JIRA_URL": os.getenv("JIRA_URL", "https://your-instance.atlassian.net"),
+            "JIRA_USERNAME": os.getenv("JIRA_USERNAME", "your-email@example.com"),
+            "JIRA_API_TOKEN": os.getenv("JIRA_API_TOKEN", "your-api-token-here")
+        },
+        "transport": "stdio"
+    },
+    "servicenow": {
+        "command": "python",
+        "args": ["-m", "servicenow_mcp.cli"],
+        "env": {
+            "SERVICENOW_INSTANCE_URL": os.getenv("SERVICENOW_INSTANCE_URL", "https://your-instance.service-now.com"),
+            "SERVICENOW_USERNAME": os.getenv("SERVICENOW_USERNAME", "your-username"),
+            "SERVICENOW_PASSWORD": os.getenv("SERVICENOW_PASSWORD", "your-password")
+        },
+        "transport": "stdio"
+    },
+    "tavily": {
+        "url": f"https://mcp.tavily.com/mcp/?tavilyApiKey={os.getenv('TAVILY_API_KEY')}",
+        "transport": "streamable_http"
+    }
+}
+
+client = MultiServerMCPClient(servers)
+
+class AgentState(TypedDict):
+    messages: List[Any]
+
+async def plan_node(state: AgentState):
+    tools = await client.get_tools()
+    system_prompt = SystemMessage(
+        content="You are an agentic AI. Plan the next steps based on the query and available tools (weather, math, JIRA, ServiceNow, Tavily). Call tools if needed."
+    )
+    response = await llm.bind_tools(tools).ainvoke([system_prompt] + state["messages"])
+    return {"messages": state["messages"] + [response]}
+
+async def tool_call_node(state: AgentState):
+    tools = await client.get_tools()
+    tool_node = ToolNode(tools)
+    return tool_node.invoke(state)
+
+async def reflect_node(state: AgentState):
+    system_prompt = SystemMessage(
+        content="Reflect on tool results and previous messages. If task complete, say 'The task is complete: [final answer]'. Else, say 'Continue: [next plan]'."
+    )
+    response = await llm.ainvoke([system_prompt] + state["messages"])
+    return {"messages": state["messages"] + [response]}
+
+def reflect_condition(state: AgentState):
+    last_message = state["messages"][-1]
+    if "complete" in last_message.content.lower():
+        return END
+    return "plan"
+
+# Build Graph
+graph = StateGraph(AgentState)
+graph.add_node("plan", plan_node)
+graph.add_node("tool_call", tool_call_node)
+graph.add_node("reflect", reflect_node)
+graph.set_entry_point("plan")
+graph.add_conditional_edges("plan", tools_condition, {"tools": "tool_call", "end": "reflect"})
+graph.add_edge("tool_call", "reflect")
+graph.add_conditional_edges("reflect", reflect_condition, {"plan": "plan", END: END})
+agent = graph.compile()
+
+async def main(query: str):
+    inputs = {"messages": [HumanMessage(content=query)]}
+    result = await agent.ainvoke(inputs)
+    final_msg = result["messages"][-1].content
+    print("Final Response:", final_msg)
+
+# Example Run
+if __name__ == "__main__":
+    asyncio.run(main("Get weather in NY and create JIRA ticket if rainy."))
+```
+
+यह code एक cyclic graph बनाता है जहां agent plan करता है, tools call करता है (parallel nếu multiple), reflect करता है, और loop करता है जब तक task complete नहीं होता। Sources: , , ,  से inspired.
+
+### Output Flow Visualization
+LangGraph workflows graphs के रूप में visualize होते हैं (nodes: plan, tool_call, reflect; edges: conditional loops)। नीचे एक Mermaid diagram है जो flow दिखाता है (web search से inspired, जैसे  में)।
+
+```mermaid
+graph TD
+    Start[Start] --> Plan[Plan Node: LLM plans and binds tools]
+    Plan -->|Has tool calls?| ToolCall[Tool Call Node: Execute MCP tools in parallel]
+    Plan -->|No tools| Reflect[Reflect Node: LLM reflects on state]
+    ToolCall --> Reflect
+    Reflect -->|Task complete?| End[End: Final Response]
+    Reflect -->|Continue| Plan
+```
+```python
+यह diagram agentic loop दिखाता है: Plan → (Tool if needed) → Reflect → Loop or End.
+
+यहां visual diagrams web से:
+
+
+
+(यह multi-agent workflow का उदाहरण है LangGraph से।)
+
+
+
+(यह RAG agent workflow का diagram है।)
+
+### Proper Example Dry Run with Responses (Handling Each Case/Scenario)
+Dry run मतलब step-by-step simulation बिना actual execution के। मैं विभिन्न scenarios के लिए simulate कर रहा हूं, assuming LLM responses (real में LLM generate करेगा)। Sources: , ,  से flow inspired.
+
+#### Scenario 1: Simple Query, No Tools Needed (Direct Answer)
+- **Query**: "What is 2+2?"
+- **Step 1: Plan Node**
+  - State: {"messages": [Human("What is 2+2?")]}
+  - LLM Response: AIMessage("No tools needed. Answer is 4.")
+  - No tool_calls → Go to Reflect.
+- **Step 2: Reflect Node**
+  - LLM Response: AIMessage("The task is complete: 4")
+  - "complete" detected → End.
+- **Final Response**: "The task is complete: 4"
+- **Handling**: Quick exit for simple cases, no loop.
+
+#### Scenario 2: Query with Single Tool Call (e.g., Weather)
+- **Query**: "Get weather in NY"
+- **Step 1: Plan Node**
+  - State: {"messages": [Human("Get weather in NY")]}
+  - LLM Response: AIMessage(tool_calls=[{"name": "get_weather", "args": {"city": "NY"}}])
+  - Has tool_calls → Go to Tool Call.
+- **Step 2: Tool Call Node**
+  - Executes get_weather → ToolMessage("Sunny, 20°C")
+  - State updated with ToolMessage.
+- **Step 3: Reflect Node**
+  - LLM Response: AIMessage("The task is complete: Weather in NY is Sunny, 20°C")
+  - "complete" → End.
+- **Final Response**: "The task is complete: Weather in NY is Sunny, 20°C"
+- **Handling**: Single tool use, no multi-turn.
+
+#### Scenario 3: Multi-Turn with Multiple Tools and Loop (Complex Task)
+- **Query**: "Get weather in NY, if rainy create JIRA ticket, then search AI news"
+- **Step 1: Plan Node**
+  - LLM Response: AIMessage(tool_calls=[{"name": "get_weather", "args": {"city": "NY"}}, {"name": "search", "args": {"query": "Latest AI news"}}])  // Parallel calls
+  - Go to Tool Call.
+- **Step 2: Tool Call Node**
+  - Results: ToolMessage("Rainy, 15°C"), ToolMessage("AI news: Grok 4 released")
+- **Step 3: Reflect Node**
+  - LLM Response: AIMessage("Continue: Weather is rainy, so create JIRA ticket.")
+  - "continue" → Loop back to Plan.
+- **Step 4: Plan Node (Loop)**
+  - Updated state with previous messages.
+  - LLM Response: AIMessage(tool_calls=[{"name": "create_issue", "args": {"project_key": "PROJ", "summary": "Rainy in NY"}}])
+  - Go to Tool Call.
+- **Step 5: Tool Call Node**
+  - Result: ToolMessage("Ticket created: JIRA-123")
+- **Step 6: Reflect Node**
+  - LLM Response: AIMessage("The task is complete: Weather rainy, ticket JIRA-123, AI news: Grok 4 released.")
+  - End.
+- **Final Response**: "The task is complete: Weather rainy, ticket JIRA-123, AI news: Grok 4 released."
+- **Handling**: Parallel tools, looping for sequential dependencies, multi-turn reasoning.
+
+#### Scenario 4: Error Handling (Tool Failure)
+- **Query**: "Add 2 and 'abc'" (Invalid math)
+- **Step 1: Plan Node**
+  - LLM Response: AIMessage(tool_calls=[{"name": "add", "args": {"a": 2, "b": "abc"}}])
+- **Step 2: Tool Call Node**
+  - Fails: ToolMessage("Error: Invalid type for add")
+- **Step 3: Reflect Node**
+  - LLM Response: AIMessage("Continue: Fix input and retry.")
+- **Step 4: Plan Node (Loop)**
+  - LLM Response: AIMessage("No tools. Invalid query.")
+- **Step 5: Reflect Node**
+  - AIMessage("The task is complete: Error - cannot add number and string.")
+  - End.
+- **Final Response**: "The task is complete: Error - cannot add number and string."
+- **Handling**: Reflection detects error, agent recovers or ends gracefully.
+
+#### Scenario 5: No Resolution After Loops (Max Loops, though not coded; assume limit)
+- **Query**: Ambiguous endless task.
+- **Handling**: In practice, add checkpointer or max_iterations in graph.compile(checkpointer=...). Here, reflection eventually completes or user intervenes.
+```
+
 ```PYTHON
 # OpenAI
 OPENAI_API_KEY=your_openai_api_key_here
