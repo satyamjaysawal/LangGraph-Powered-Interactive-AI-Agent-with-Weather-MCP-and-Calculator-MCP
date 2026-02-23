@@ -127,17 +127,6 @@ graph TD
     Reflect -->|Continue| Plan
 ```
 ```python
-यह diagram agentic loop दिखाता है: Plan → (Tool if needed) → Reflect → Loop or End.
-
-यहां visual diagrams web से:
-
-
-
-(यह multi-agent workflow का उदाहरण है LangGraph से।)
-
-
-
-(यह RAG agent workflow का diagram है।)
 
 ### Proper Example Dry Run with Responses (Handling Each Case/Scenario)
 Dry run मतलब step-by-step simulation बिना actual execution के। मैं विभिन्न scenarios के लिए simulate कर रहा हूं, assuming LLM responses (real में LLM generate करेगा)। Sources: , ,  से flow inspired.
